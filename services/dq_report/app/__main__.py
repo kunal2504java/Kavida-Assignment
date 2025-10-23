@@ -9,11 +9,13 @@ from typing import Optional
 from pythonjsonlogger import jsonlogger
 
 from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from .database import ViolationsDatabase
 from .consumer import ViolationsConsumer
+from .dlq_replay import DLQReplayService
 
 
 def setup_logging():
@@ -45,12 +47,13 @@ app = FastAPI(
 # Global instances
 db: ViolationsDatabase = None
 consumer: ViolationsConsumer = None
+dlq_replay: DLQReplayService = None
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and start Kafka consumer on startup."""
-    global db, consumer
+    global db, consumer, dlq_replay
     
     logger.info("Starting DQ Report service")
     
@@ -68,6 +71,10 @@ async def startup_event():
     )
     consumer.start()
     logger.info("Kafka consumer started")
+    
+    # Initialize DLQ replay service
+    dlq_replay = DLQReplayService(bootstrap_servers=bootstrap_servers)
+    logger.info("DLQ replay service initialized")
 
 
 @app.on_event("shutdown")
@@ -83,9 +90,24 @@ async def shutdown_event():
     logger.info("DQ Report service stopped")
 
 
+# Mount static files for dashboard
+try:
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+except Exception as e:
+    logger.warning(f"Could not mount static files: {e}")
+
+
 @app.get("/")
 async def root():
-    """Root endpoint with service information."""
+    """Root endpoint - redirects to dashboard."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "dashboard.html"))
+
+
+@app.get("/api")
+async def api_root():
+    """API root endpoint with service information."""
     return {
         "service": "Data Quality Report API",
         "version": "1.0.0",
@@ -227,6 +249,101 @@ async def get_statistics():
         }
     except Exception as e:
         logger.error(f"Failed to get statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dlq/list")
+async def list_dlq_topics():
+    """
+    List all DLQ topics and their message counts.
+    
+    Returns:
+        List of DLQ topics with message counts
+    """
+    try:
+        dlq_info = dlq_replay.list_dlq_topics()
+        
+        return {
+            "dlq_topics": dlq_info,
+            "total_dlq_messages": sum(t["message_count"] for t in dlq_info)
+        }
+    except Exception as e:
+        logger.error(f"Failed to list DLQ topics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/dlq/replay/{domain}")
+async def replay_dlq_domain(
+    domain: str,
+    max_messages: Optional[int] = Query(None, description="Maximum messages to replay")
+):
+    """
+    Replay messages from a domain's DLQ back to its raw topic.
+    
+    Args:
+        domain: Domain name (customers, orders, lines)
+        max_messages: Maximum number of messages to replay (optional)
+        
+    Returns:
+        Replay statistics
+    """
+    valid_domains = ["customers", "orders", "lines"]
+    
+    if domain not in valid_domains:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid domain. Must be one of: {', '.join(valid_domains)}"
+        )
+    
+    try:
+        logger.info(f"Starting DLQ replay for domain: {domain}")
+        
+        stats = dlq_replay.replay_domain_dlq(
+            domain=domain,
+            max_messages=max_messages
+        )
+        
+        logger.info(f"DLQ replay completed for {domain}: {stats}")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Failed to replay DLQ for {domain}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/dlq/replay-custom")
+async def replay_dlq_custom(
+    dlq_topic: str = Query(..., description="Source DLQ topic"),
+    target_topic: str = Query(..., description="Target topic"),
+    max_messages: Optional[int] = Query(None, description="Maximum messages to replay")
+):
+    """
+    Replay messages from a custom DLQ topic to a target topic.
+    
+    Args:
+        dlq_topic: Source DLQ topic name
+        target_topic: Target topic name
+        max_messages: Maximum number of messages to replay (optional)
+        
+    Returns:
+        Replay statistics
+    """
+    try:
+        logger.info(f"Starting custom DLQ replay from {dlq_topic} to {target_topic}")
+        
+        stats = dlq_replay.replay_dlq_messages(
+            dlq_topic=dlq_topic,
+            target_topic=target_topic,
+            max_messages=max_messages
+        )
+        
+        logger.info(f"Custom DLQ replay completed: {stats}")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Failed to replay DLQ: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

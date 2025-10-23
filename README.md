@@ -43,6 +43,14 @@ The DQ pipeline consists of the following components:
 - ✅ **REST API**: Query violations and generate reports
 - ✅ **Fully Containerized**: Single `docker-compose up` command to run
 
+### 🎁 Bonus Features
+
+- ✅ **Schema Registry**: Confluent Schema Registry for centralized schema management
+- ✅ **Interactive Dashboard**: Real-time DQ visualization with Chart.js
+- ✅ **DLQ Replay**: Automated replay mechanism for reprocessing failed messages
+
+> See [BONUS_FEATURES.md](BONUS_FEATURES.md) for detailed documentation on bonus features.
+
 ## Technology Stack
 
 - **Language**: Python 3.11
@@ -156,9 +164,29 @@ The pipeline uses the following Kafka topics:
 ### Violations Topic
 - `dq.violations` - Data quality violation events
 
+## Web Dashboard
+
+Access the interactive DQ Dashboard at:
+```
+http://localhost:8000/
+```
+
+The dashboard provides:
+- Real-time violation statistics
+- Interactive charts (pie chart and bar chart)
+- Top violations table with severity indicators
+- Auto-refresh every 30 seconds
+
 ## API Endpoints
 
 The DQ Report service exposes the following REST API endpoints on port 8000:
+
+### Dashboard
+
+```bash
+# Access interactive dashboard
+open http://localhost:8000/
+```
 
 ### Health Check
 
@@ -283,6 +311,67 @@ curl http://localhost:8000/dq-stats
     "latest_violation": "2024-01-20T14:30:00Z"
   }
 }
+```
+
+### DLQ Management (Bonus Feature)
+
+#### List DLQ Topics
+
+Get information about all DLQ topics and message counts:
+
+```bash
+curl http://localhost:8000/dlq/list
+```
+
+**Response**:
+```json
+{
+  "dlq_topics": [
+    {
+      "topic": "invalid.customers.dlq",
+      "domain": "customers",
+      "message_count": 15,
+      "target_topic": "raw.customers"
+    }
+  ],
+  "total_dlq_messages": 26
+}
+```
+
+#### Replay DLQ Messages
+
+Replay messages from a domain's DLQ back to its raw topic:
+
+```bash
+# Replay all messages
+curl -X POST "http://localhost:8000/dlq/replay/customers"
+
+# Replay limited messages
+curl -X POST "http://localhost:8000/dlq/replay/customers?max_messages=10"
+```
+
+**Response**:
+```json
+{
+  "dlq_topic": "invalid.customers.dlq",
+  "target_topic": "raw.customers",
+  "messages_read": 15,
+  "messages_replayed": 15,
+  "errors": 0,
+  "error_details": []
+}
+```
+
+### Schema Registry (Bonus Feature)
+
+Access Confluent Schema Registry at `http://localhost:8081`:
+
+```bash
+# List all schemas
+curl http://localhost:8081/subjects
+
+# Get specific schema
+curl http://localhost:8081/subjects/customers-value/versions/latest
 ```
 
 ## Testing

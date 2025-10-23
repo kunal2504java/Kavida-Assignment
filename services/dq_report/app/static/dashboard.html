@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Quality Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .chart-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .table-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #667eea;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+            padding: 50px;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-high {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .badge-medium {
+            background: #ffd93d;
+            color: #333;
+        }
+
+        .badge-low {
+            background: #6bcf7f;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Data Quality Dashboard</h1>
+            <p>Real-time monitoring of data quality violations</p>
+        </div>
+
+        <div id="loading" class="loading">Loading dashboard data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Violations</h3>
+                    <div class="value" id="totalViolations">0</div>
+                    <div class="label">All time</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Customers</h3>
+                    <div class="value" id="customersViolations">0</div>
+                    <div class="label">Violations</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Orders</h3>
+                    <div class="value" id="ordersViolations">0</div>
+                    <div class="label">Violations</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Lines</h3>
+                    <div class="value" id="linesViolations">0</div>
+                    <div class="label">Violations</div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h2>Violations by Domain</h2>
+                    <div class="chart-container">
+                        <canvas id="domainChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h2>Top 10 Violation Rules</h2>
+                    <div class="chart-container">
+                        <canvas id="rulesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Violations Table -->
+            <div class="table-card">
+                <h2>Top Violations (Last 24 Hours)</h2>
+                <table id="topViolationsTable">
+                    <thead>
+                        <tr>
+                            <th>Domain</th>
+                            <th>Rule Name</th>
+                            <th>Count</th>
+                            <th>Severity</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topViolationsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh</button>
+    </div>
+
+    <script>
+        let domainChart, rulesChart;
+
+        async function loadDashboard() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('error').style.display = 'none';
+                document.getElementById('content').style.display = 'none';
+
+                // Fetch stats
+                const statsResponse = await fetch('/dq-stats');
+                const stats = await statsResponse.json();
+
+                // Fetch top violations
+                const topResponse = await fetch('/dq-top-violations?hours=24&limit=10');
+                const topData = await topResponse.json();
+
+                // Update stats
+                document.getElementById('totalViolations').textContent = 
+                    stats.statistics.total_violations.toLocaleString();
+                document.getElementById('customersViolations').textContent = 
+                    (stats.statistics.violations_by_domain.customers || 0).toLocaleString();
+                document.getElementById('ordersViolations').textContent = 
+                    (stats.statistics.violations_by_domain.orders || 0).toLocaleString();
+                document.getElementById('linesViolations').textContent = 
+                    (stats.statistics.violations_by_domain.lines || 0).toLocaleString();
+
+                // Update domain chart
+                updateDomainChart(stats.statistics.violations_by_domain);
+
+                // Update rules chart
+                updateRulesChart(topData.top_violations);
+
+                // Update table
+                updateTopViolationsTable(topData.top_violations);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 
+                    'Error loading dashboard data: ' + error.message;
+            }
+        }
+
+        function updateDomainChart(violationsByDomain) {
+            const ctx = document.getElementById('domainChart').getContext('2d');
+            
+            if (domainChart) {
+                domainChart.destroy();
+            }
+
+            const domains = Object.keys(violationsByDomain);
+            const counts = Object.values(violationsByDomain);
+
+            domainChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: domains.map(d => d.charAt(0).toUpperCase() + d.slice(1)),
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#4facfe'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateRulesChart(topViolations) {
+            const ctx = document.getElementById('rulesChart').getContext('2d');
+            
+            if (rulesChart) {
+                rulesChart.destroy();
+            }
+
+            const rules = topViolations.map(v => v.rule_name);
+            const counts = topViolations.map(v => v.violation_count);
+
+            rulesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: rules,
+                    datasets: [{
+                        label: 'Violations',
+                        data: counts,
+                        backgroundColor: '#667eea',
+                        borderColor: '#5568d3',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTopViolationsTable(topViolations) {
+            const tbody = document.getElementById('topViolationsBody');
+            tbody.innerHTML = '';
+
+            if (topViolations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No violations found</td></tr>';
+                return;
+            }
+
+            topViolations.forEach(violation => {
+                const row = document.createElement('tr');
+                
+                const severity = violation.violation_count > 10 ? 'high' : 
+                                violation.violation_count > 5 ? 'medium' : 'low';
+                const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
+
+                row.innerHTML = `
+                    <td><strong>${violation.domain}</strong></td>
+                    <td>${violation.rule_name}</td>
+                    <td><strong>${violation.violation_count}</strong></td>
+                    <td><span class="badge badge-${severity}">${severityLabel}</span></td>
+                    <td>${new Date(violation.first_seen).toLocaleString()}</td>
+                    <td>${new Date(violation.last_seen).toLocaleString()}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

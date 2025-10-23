@@ -38,6 +38,25 @@ services:
       timeout: 10s
       retries: 10
 
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:29092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   kafka-setup:
     image: confluentinc/cp-kafka:7.5.0
     hostname: kafka-setup
@@ -71,8 +90,11 @@ services:
     depends_on:
       kafka-setup:
         condition: service_completed_successfully
+      schema-registry:
+        condition: service_healthy
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
       LOG_LEVEL: INFO
     volumes:
       - ./contracts:/contracts:ro
