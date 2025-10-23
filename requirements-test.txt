@@ -1,0 +1,6 @@
+# Test dependencies for running tests locally
+pytest==7.4.3
+kafka-python==2.0.2
+requests==2.31.0
+jsonschema==4.20.0
+PyYAML==6.0.1

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OrderLine",
+  "description": "Schema for order line item data validation",
+  "type": "object",
+  "required": ["line_id", "order_id", "product_id", "quantity", "unit_price"],
+  "properties": {
+    "line_id": {
+      "type": "string",
+      "pattern": "^LINE-[0-9]{10}$",
+      "description": "Unique line item identifier"
+    },
+    "order_id": {
+      "type": "string",
+      "pattern": "^ORD-[0-9]{8}$",
+      "description": "Reference to order ID"
+    },
+    "product_id": {
+      "type": "string",
+      "pattern": "^PROD-[0-9]{6}$",
+      "description": "Reference to product ID"
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "description": "Quantity of items ordered"
+    },
+    "unit_price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Price per unit"
+    },
+    "line_total": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total price for this line (quantity * unit_price)"
+    },
+    "discount_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Discount percentage applied to this line"
+    },
+    "product_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    }
+  },
+  "additionalProperties": false
+}

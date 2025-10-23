@@ -1,0 +1,77 @@
+---
+# Business Rules for Data Quality Validation
+# Each rule defines domain-specific validation logic beyond schema validation
+
+customers:
+  - rule_name: "age_minimum_requirement"
+    description: "Customer must be at least 18 years old"
+    field: "age"
+    condition: "gte"
+    value: 18
+    error_message: "Customer age must be 18 or older"
+
+  - rule_name: "valid_email_domain"
+    description: "Email must be from allowed domains"
+    field: "email"
+    condition: "not_in_domains"
+    value: ["tempmail.com", "throwaway.email", "guerrillamail.com"]
+    error_message: "Email domain is not allowed"
+
+  - rule_name: "active_status_check"
+    description: "New customers must have active status"
+    field: "status"
+    condition: "in"
+    value: ["active", "inactive"]
+    error_message: "Invalid customer status"
+
+orders:
+  - rule_name: "minimum_order_value"
+    description: "Order total must be greater than zero"
+    field: "order_total"
+    condition: "gt"
+    value: 0
+    error_message: "Order total must be greater than 0"
+
+  - rule_name: "order_total_sanity_check"
+    description: "Order total should not exceed reasonable maximum"
+    field: "order_total"
+    condition: "lte"
+    value: 1000000
+    error_message: "Order total exceeds maximum allowed value"
+
+  - rule_name: "items_count_positive"
+    description: "Order must contain at least one item"
+    field: "items_count"
+    condition: "gte"
+    value: 1
+    error_message: "Order must have at least one item"
+
+  - rule_name: "discount_validation"
+    description: "Discount cannot exceed order total"
+    field: "discount_applied"
+    condition: "lte_field"
+    compare_field: "order_total"
+    error_message: "Discount amount cannot exceed order total"
+
+lines:
+  - rule_name: "quantity_positive"
+    description: "Line item quantity must be positive"
+    field: "quantity"
+    condition: "gte"
+    value: 1
+    error_message: "Quantity must be at least 1"
+
+  - rule_name: "unit_price_positive"
+    description: "Unit price must be greater than zero"
+    field: "unit_price"
+    condition: "gt"
+    value: 0
+    error_message: "Unit price must be greater than 0"
+
+  - rule_name: "line_total_calculation"
+    description: "Line total should match quantity * unit_price"
+    field: "line_total"
+    condition: "calculated_match"
+    formula: "quantity * unit_price"
+    tolerance: 0.01
+    error_message: "Line total does not match calculated value"
